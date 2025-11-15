@@ -394,7 +394,7 @@
             }
 
             // 取得標題列（第一列）
-            const headers = rows[0].c.map(cell => cell ? cell.v : '');
+            const headers = rows[0].c.map(cell => cell ? String(cell.v) : '');
 
             // 找出各欄位的索引
             const codeIndex = headers.findIndex(h => h && h.includes('編號'));
