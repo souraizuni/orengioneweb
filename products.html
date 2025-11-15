@@ -125,14 +125,14 @@
 
         .search-box input {
             width: 100%;
-            padding: 20px 60px 20px 60px;
-            padding-left: 70px;
+            padding: 15px 50px 15px 60px;
             border: 3px solid #e0e0e0;
             border-radius: 12px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 500;
             transition: all 0.3s ease;
             background: #f9f9f9;
+            box-sizing: border-box;
         }
 
         .search-box input:focus {
@@ -306,16 +306,17 @@
 
         .quick-input-field {
             flex: 1;
-            padding: 15px;
+            padding: 12px;
             border: 3px solid #e0e0e0;
             border-radius: 8px;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             text-align: center;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             font-family: monospace;
             transition: border-color 0.3s;
             text-transform: uppercase;
+            box-sizing: border-box;
         }
 
         .quick-input-field:focus {
@@ -728,73 +729,61 @@
 
         <!-- 商品查詢區 -->
         <div class="search-section" id="searchSection">
-            <div class="card">
-                <!-- 快速輸入模式 -->
-                <div class="quick-input-mode active" id="quickInputMode">
-                    <div class="quick-input-container">
-                        <div class="quick-input-display">
-                            <input 
-                                type="text" 
-                                id="quickInput" 
-                                class="quick-input-field"
-                                placeholder="輸入編號..."
-                                maxlength="20"
-                                onkeyup="handleQuickInput(event)">
-                            <button class="quick-clear-btn" onclick="clearQuickInput()">清除</button>
-                        </div>
-
-                        <div class="keyboard-container" id="keyboardContainer">
-                            <!-- 鍵盤會通過 JavaScript 生成 -->
-                        </div>
-
-                        <div class="keyboard-actions">
-                            <div class="view-toggle">
-                                <button class="view-btn active" onclick="switchView('list')">📋 列表</button>
-                                <button class="view-btn" onclick="switchView('grid')">📱 卡片</button>
-                            </div>
-                        </div>
-
-                        <div class="search-stats">
-                            商品：<strong id="totalProducts">0</strong> / 結果：<strong id="displayedProducts">0</strong>
-                        </div>
-                    </div>
+            <!-- 快速輸入模式 -->
+            <div class="card quick-input-mode active" id="quickInputMode">
+                <div class="quick-input-display">
+                    <input 
+                        type="text" 
+                        id="quickInput" 
+                        class="quick-input-field"
+                        placeholder="輸入編號..."
+                        maxlength="20"
+                        onkeyup="handleQuickInput(event)"
+                        readonly>
                 </div>
 
-                <!-- 進階搜尋模式 -->
-                <div class="search-mode" id="searchMode">
-                    <div class="sheet-tabs" id="sheetTabs"></div>
-
-                    <div class="search-box">
-                        <input
-                            type="text"
-                            id="searchInput"
-                            placeholder="搜尋商品編號、名稱或條碼..."
-                            oninput="searchProducts()">
-                    </div>
-
-                    <div class="search-stats">
-                        商品：<strong id="totalProducts2">0</strong> / 結果：<strong id="displayedProducts2">0</strong>
-                    </div>
-
-                    <div class="search-options">
-                        <label class="checkbox-label">
-                            <input 
-                                type="checkbox" 
-                                id="searchBarcode"
-                                onchange="searchProducts()">
-                            <span class="checkbox-text">搜尋條碼</span>
-                        </label>
-                    </div>
-
-                    <div class="view-toggle">
-                        <button class="view-btn active" onclick="switchView('list')">📋 列表</button>
-                        <button class="view-btn" onclick="switchView('grid')">📱 卡片</button>
-                    </div>
-
-                    <button class="btn" onclick="resetSheet()" style="background: #95a5a6; margin-top: 10px;">
-                        重新設定 Google Sheet
-                    </button>
+                <div class="keyboard-container" id="keyboardContainer">
+                    <!-- 鍵盤會通過 JavaScript 生成 -->
                 </div>
+
+                <div class="keyboard-actions">
+                    <!-- 操作按鈕會通過 JavaScript 生成 -->
+                </div>
+
+                <div class="search-stats">
+                    商品：<strong id="totalProducts">0</strong> / 結果：<strong id="displayedProducts">0</strong>
+                </div>
+            </div>
+
+            <!-- 進階搜尋模式 -->
+            <div class="card search-mode" id="searchMode">
+                <div class="sheet-tabs" id="sheetTabs"></div>
+
+                <div class="search-box">
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="搜尋商品編號、名稱或條碼..."
+                        oninput="searchProducts()">
+                </div>
+
+                <div class="search-stats">
+                    商品：<strong id="totalProducts2">0</strong> / 結果：<strong id="displayedProducts2">0</strong>
+                </div>
+
+                <div class="search-options">
+                    <label class="checkbox-label">
+                        <input 
+                            type="checkbox" 
+                            id="searchBarcode"
+                            onchange="searchProducts()">
+                        <span class="checkbox-text">搜尋條碼</span>
+                    </label>
+                </div>
+
+                <button class="btn" onclick="resetSheet()" style="background: #95a5a6; margin-top: 10px;">
+                    重新設定 Google Sheet
+                </button>
             </div>
 
             <div class="card">
@@ -808,6 +797,11 @@
                 <div style="margin-bottom: 15px; color: #666; font-size: 13px;">
                     <strong style="color: #667eea;">輸入商品編號：</strong> 例如 A46B、B1610A、BC12 等
                     <br><span style="font-size: 12px; color: #999;">不需輸入 O 和 -，系統會自動補上</span>
+                </div>
+
+                <div class="view-toggle" style="margin-bottom: 15px;">
+                    <button class="view-btn active" onclick="switchView('list')">📋 列表</button>
+                    <button class="view-btn" onclick="switchView('grid')">📱 卡片</button>
                 </div>
 
                 <div class="mode-toggle">
@@ -865,19 +859,6 @@
                 actionRow.style.justifyContent = 'center';
                 actionRow.style.marginBottom = '10px';
                 actionRow.style.flexWrap = 'wrap';
-
-                // 視圖切換按鈕
-                const listBtn = document.createElement('button');
-                listBtn.className = 'view-btn active';
-                listBtn.textContent = '📋 列表';
-                listBtn.onclick = () => switchView('list');
-                actionRow.appendChild(listBtn);
-
-                const gridBtn = document.createElement('button');
-                gridBtn.className = 'view-btn';
-                gridBtn.textContent = '📱 卡片';
-                gridBtn.onclick = () => switchView('grid');
-                actionRow.appendChild(gridBtn);
 
                 // 刪除按鈕
                 const deleteBtn = document.createElement('button');
