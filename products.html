@@ -471,36 +471,11 @@
             color: #999;
         }
 
-        .product-list-toolbar {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
         .product-list-price {
             font-size: 1.1em;
             color: #e74c3c;
             font-weight: bold;
-            min-width: 80px;
             text-align: right;
-        }
-
-        .product-list-detail {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: #f0f0f0;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #666;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .product-list-detail:hover {
-            background: #667eea;
-            color: white;
         }
 
         .product-card {
@@ -800,13 +775,13 @@
                 </div>
 
                 <div class="view-toggle" style="margin-bottom: 15px;">
-                    <button class="view-btn active" onclick="switchView('list')">📋 列表</button>
-                    <button class="view-btn" onclick="switchView('grid')">📱 卡片</button>
+                    <button class="view-btn active" onclick="switchView('list', this)">📋 列表</button>
+                    <button class="view-btn" onclick="switchView('grid', this)">📱 卡片</button>
                 </div>
 
                 <div class="mode-toggle">
-                    <button class="mode-btn active" onclick="switchMode('quick')">⚡ 快速查詢</button>
-                    <button class="mode-btn" onclick="switchMode('search')">🔍 進階搜尋</button>
+                    <button class="mode-btn active" onclick="switchMode('quick', this)">⚡ 快速查詢</button>
+                    <button class="mode-btn" onclick="switchMode('search', this)">🔍 進階搜尋</button>
                 </div>
             </div>
         </div>
@@ -819,6 +794,7 @@
         let currentSheetFilter = 'all';
         let currentViewMode = 'list';  // 'list' 或 'grid'
         let currentMode = 'quick';  // 'quick' 或 'search'
+        let searchTimeout = null;  // debounce timer
 
         // 鍵盤配置（QWERTY 佈局）
         const keyboardLayout = [
@@ -916,7 +892,7 @@
 
             // 只允許英文、數字、-
             value = value.replace(/[^0-9A-Z-]/g, '');
-            
+
             // 自動插入 - 號：O + 1-2個英文 + -
             // 如果輸入超過 O 且第一個是數字，在前面插入 -
             if (value.length > 1) {
@@ -928,12 +904,17 @@
                     value = value.slice(0, 1 + letterCount) + '-' + value.slice(1 + letterCount);
                 }
             }
-            
+
             input.value = value;
 
-            // 任何時候輸入有內容就開始搜尋
+            // 使用 debounce 優化搜尋效能
+            clearTimeout(searchTimeout);
             if (value.length > 0) {
-                quickSearch();
+                searchTimeout = setTimeout(() => quickSearch(), 300);
+            } else {
+                // 輸入為空時立即清除結果
+                document.getElementById('productsContainer').innerHTML = '<div class="loading">準備就緒</div>';
+                document.getElementById('displayedProducts').textContent = '0';
             }
         }
 
@@ -967,14 +948,16 @@
         }
 
         // 模式切換
-        function switchMode(mode) {
+        function switchMode(mode, clickedButton) {
             currentMode = mode;
 
             // 更新按鈕外觀
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
 
             // 切換模式顯示
             const quickMode = document.getElementById('quickInputMode');
@@ -1005,6 +988,21 @@
                 document.getElementById('pageHeader').style.display = 'none';
             }, 500);
         });
+
+        // 更新統計數字
+        function updateStats(totalCount, displayedCount) {
+            // 更新快速搜尋模式的統計
+            const totalEl1 = document.getElementById('totalProducts');
+            const displayedEl1 = document.getElementById('displayedProducts');
+            if (totalEl1) totalEl1.textContent = totalCount;
+            if (displayedEl1) displayedEl1.textContent = displayedCount;
+
+            // 更新進階搜尋模式的統計
+            const totalEl2 = document.getElementById('totalProducts2');
+            const displayedEl2 = document.getElementById('displayedProducts2');
+            if (totalEl2) totalEl2.textContent = totalCount;
+            if (displayedEl2) displayedEl2.textContent = displayedCount;
+        }
 
         // 從 Google Sheet URL 提取 Sheet ID
         function extractSheetId(url) {
@@ -1421,9 +1419,7 @@
                         <p>請嘗試其他搜尋關鍵字</p>
                     </div>
                 `;
-                document.getElementById('displayedProducts').textContent = '0';
-                const el2 = document.getElementById('displayedProducts2');
-                if (el2) el2.textContent = '0';
+                updateStats(0, 0);
                 return;
             }
 
@@ -1433,19 +1429,11 @@
                 displayGridView(products, container);
             }
 
-            const totalCount = currentSheetFilter === 'all' 
-                ? productsData.length 
+            const totalCount = currentSheetFilter === 'all'
+                ? productsData.length
                 : productsData.filter(p => p.category === currentSheetFilter).length;
-            
-            // 更新快速搜尋模式的統計
-            document.getElementById('totalProducts').textContent = totalCount;
-            document.getElementById('displayedProducts').textContent = products.length;
 
-            // 更新進階搜尋模式的統計
-            const el2_total = document.getElementById('totalProducts2');
-            const el2_displayed = document.getElementById('displayedProducts2');
-            if (el2_total) el2_total.textContent = totalCount;
-            if (el2_displayed) el2_displayed.textContent = products.length;
+            updateStats(totalCount, products.length);
         }
 
         // 列表視圖
@@ -1457,12 +1445,7 @@
                         <div class="product-list-name">${escapeHtml(product.name)}</div>
                         <div class="product-list-category">${escapeHtml(product.sheet)}</div>
                     </div>
-                    <div class="product-list-toolbar">
-                        <div class="product-list-price">NT$ ${escapeHtml(String(product.price))}</div>
-                        <div class="product-list-detail" onclick="showProductDetail(${index}, event)" title="檢視詳情">
-                            ℹ️ 詳情
-                        </div>
-                    </div>
+                    <div class="product-list-price">NT$ ${escapeHtml(String(product.price))}</div>
                 </div>
             `).join('');
 
@@ -1492,6 +1475,9 @@
             // 為每個商品生成條形碼
             products.forEach((product, index) => {
                 if (product.barcode) {
+                    const barcodeElement = document.querySelector(`#barcode-${index}`);
+                    if (!barcodeElement) return;
+
                     try {
                         JsBarcode(`#barcode-${index}`, product.barcode, {
                             format: "CODE128",
@@ -1501,24 +1487,36 @@
                             margin: 5
                         });
                     } catch (e) {
-                        console.log(`生成條形碼失敗: ${e.message}`);
+                        console.error(`條碼生成失敗 [${product.code}]:`, e.message);
+                        // 顯示錯誤訊息給使用者
+                        barcodeElement.parentElement.innerHTML = `
+                            <div style="color: #999; font-size: 12px; text-align: center; padding: 10px;">
+                                ⚠️ 條碼格式錯誤
+                            </div>
+                        `;
                     }
                 }
             });
         }
 
         // 視圖切換
-        function switchView(mode) {
+        function switchView(mode, clickedButton) {
             currentViewMode = mode;
-            
+
             // 更新按鈕外觀
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
 
             // 重新渲染當前搜尋結果
-            searchProducts();
+            if (currentMode === 'quick') {
+                quickSearch();
+            } else {
+                searchProducts();
+            }
         }
 
         // 顯示商品詳情（彈出視窗）
@@ -1577,63 +1575,81 @@
                 z-index: 1000;
             `;
 
-            modal.innerHTML = `
-                <div style="
-                    background: white;
-                    border-radius: 12px;
-                    padding: 20px;
-                    max-width: 500px;
-                    width: 90%;
-                    max-height: 90vh;
-                    overflow-y: auto;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0;">
-                        <h3 style="margin: 0; color: #333;">${escapeHtml(product.name)}</h3>
-                        <span style="cursor: pointer; font-size: 20px; color: #999;" onclick="this.closest('[style*=position: fixed]').remove()">✕</span>
-                    </div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <div>
-                            <strong style="color: #667eea;">產品編號</strong>
-                            <div style="font-size: 14px; color: #333; margin-top: 4px;">${escapeHtml(product.code)}</div>
-                        </div>
-                        
-                        <div>
-                            <strong style="color: #667eea;">分類</strong>
-                            <div style="font-size: 14px; color: #333; margin-top: 4px;">${escapeHtml(product.sheet)}</div>
-                        </div>
-                        
-                        <div>
-                            <strong style="color: #667eea;">售價</strong>
-                            <div style="font-size: 18px; color: #e74c3c; font-weight: bold; margin-top: 4px;">NT$ ${escapeHtml(String(product.price))}</div>
-                        </div>
-                        
-                        <div>
-                            <strong style="color: #667eea;">特價</strong>
-                            <div style="font-size: 16px; color: #e74c3c; margin-top: 4px;">${product.barcode ? '(詳見條碼)' : '-'}</div>
-                        </div>
-                        
-                        <div>
-                            <strong style="color: #667eea;">國際條碼</strong>
-                            <div style="font-size: 14px; color: #333; font-family: monospace; margin-top: 8px; padding: 10px; background: #f9f9f9; border-radius: 6px; word-break: break-all;">
-                                ${escapeHtml(product.barcode || '無')}
-                            </div>
-                        </div>
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            `;
 
-                        ${product.barcode ? `
-                        <div>
-                            <strong style="color: #667eea;">條形碼</strong>
-                            <div style="margin-top: 8px; display: flex; justify-content: center;">
-                                <svg id="modal-barcode" style="height: 80px;"></svg>
-                            </div>
-                        </div>
-                        ` : ''}
+            // 建立標題區域
+            const headerDiv = document.createElement('div');
+            headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0;';
+
+            const title = document.createElement('h3');
+            title.style.cssText = 'margin: 0; color: #333;';
+            title.textContent = product.name;
+
+            const closeBtn = document.createElement('span');
+            closeBtn.style.cssText = 'cursor: pointer; font-size: 20px; color: #999;';
+            closeBtn.textContent = '✕';
+            closeBtn.onclick = () => modal.remove();
+
+            headerDiv.appendChild(title);
+            headerDiv.appendChild(closeBtn);
+            modalContent.appendChild(headerDiv);
+
+            // 建立內容區域
+            const contentDiv = document.createElement('div');
+            contentDiv.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                        <strong style="color: #667eea;">產品編號</strong>
+                        <div style="font-size: 14px; color: #333; margin-top: 4px;">${escapeHtml(product.code)}</div>
                     </div>
+
+                    <div>
+                        <strong style="color: #667eea;">分類</strong>
+                        <div style="font-size: 14px; color: #333; margin-top: 4px;">${escapeHtml(product.sheet)}</div>
+                    </div>
+
+                    <div>
+                        <strong style="color: #667eea;">售價</strong>
+                        <div style="font-size: 18px; color: #e74c3c; font-weight: bold; margin-top: 4px;">NT$ ${escapeHtml(String(product.price))}</div>
+                    </div>
+
+                    <div>
+                        <strong style="color: #667eea;">特價</strong>
+                        <div style="font-size: 16px; color: #e74c3c; margin-top: 4px;">${product.barcode ? '(詳見條碼)' : '-'}</div>
+                    </div>
+
+                    <div>
+                        <strong style="color: #667eea;">國際條碼</strong>
+                        <div style="font-size: 14px; color: #333; font-family: monospace; margin-top: 8px; padding: 10px; background: #f9f9f9; border-radius: 6px; word-break: break-all;">
+                            ${escapeHtml(product.barcode || '無')}
+                        </div>
+                    </div>
+
+                    ${product.barcode ? `
+                    <div>
+                        <strong style="color: #667eea;">條形碼</strong>
+                        <div style="margin-top: 8px; display: flex; justify-content: center;">
+                            <svg id="modal-barcode" style="height: 80px;"></svg>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
 
+            modalContent.appendChild(contentDiv);
+            modal.appendChild(modalContent);
             document.body.appendChild(modal);
+
             modal.onclick = (e) => {
                 if (e.target === modal) modal.remove();
             };
@@ -1641,6 +1657,9 @@
             // 生成條形碼
             if (product.barcode) {
                 setTimeout(() => {
+                    const modalBarcode = document.querySelector('#modal-barcode');
+                    if (!modalBarcode) return;
+
                     try {
                         JsBarcode('#modal-barcode', product.barcode, {
                             format: "CODE128",
@@ -1650,7 +1669,13 @@
                             margin: 5
                         });
                     } catch (e) {
-                        console.log(`生成條形碼失敗: ${e.message}`);
+                        console.error(`條碼生成失敗 [${product.code}]:`, e.message);
+                        // 顯示錯誤訊息給使用者
+                        modalBarcode.parentElement.innerHTML = `
+                            <div style="color: #999; font-size: 14px; text-align: center; padding: 10px;">
+                                ⚠️ 條碼格式錯誤，無法生成條形碼
+                            </div>
+                        `;
                     }
                 }, 100);
             }
