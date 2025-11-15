@@ -200,6 +200,45 @@
             font-family: monospace;
         }
 
+        .product-card .product-sheet {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .sheet-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sheet-tab {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .sheet-tab:hover {
+            border-color: #667eea;
+        }
+
+        .sheet-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .sheet-tab.all {
+            font-weight: 600;
+        }
+
         .no-results {
             text-align: center;
             padding: 40px;
@@ -287,6 +326,8 @@
         <!-- 商品查詢區 -->
         <div class="search-section" id="searchSection">
             <div class="card">
+                <div class="sheet-tabs" id="sheetTabs"></div>
+
                 <div class="stats">
                     <div class="stat-card">
                         <div class="number" id="totalProducts">0</div>
@@ -322,6 +363,8 @@
     <script>
         let productsData = [];
         let sheetId = '';
+        let allSheets = [];
+        let currentSheetFilter = 'all';
 
         // 從 Google Sheet URL 提取 Sheet ID
         function extractSheetId(url) {
@@ -329,7 +372,7 @@
             return match ? match[1] : null;
         }
 
-        // 載入 Google Sheet 資料
+        // 載入 Google Sheet 資料（所有工作表）
         async function loadSheet() {
             const urlInput = document.getElementById('sheetUrl');
             const messageDiv = document.getElementById('setupMessage');
@@ -349,7 +392,7 @@
             messageDiv.innerHTML = '<div class="loading">載入中，請稍候...</div>';
 
             try {
-                // 使用 Google Sheets JSON API
+                // 使用 Google Sheets JSON API 獲取所有工作表
                 const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
                 const response = await fetch(apiUrl);
 
@@ -358,12 +401,14 @@
                 }
 
                 const text = await response.text();
-                // Google 回傳的格式是 JSONP，需要處理
                 const jsonText = text.substring(47).slice(0, -2);
                 const data = JSON.parse(jsonText);
 
-                // 解析資料
-                parseSheetData(data);
+                // 解析第一個工作表的資料
+                parseSheetData(data, 'Sheet1');
+
+                // 嘗試載入其他工作表
+                await loadAllSheets();
 
                 // 儲存到 localStorage
                 localStorage.setItem('sheetUrl', url);
@@ -375,6 +420,7 @@
                 setTimeout(() => {
                     document.getElementById('setupCard').style.display = 'none';
                     document.getElementById('searchSection').classList.add('active');
+                    renderSheetTabs();
                     displayProducts(productsData);
                 }, 1000);
 
@@ -384,25 +430,57 @@
             }
         }
 
-        // 解析 Google Sheet 資料
-        function parseSheetData(data) {
-            productsData = [];
+        // 載入所有工作表
+        async function loadAllSheets() {
+            const sheetNames = ['Sheet1', 'Sheet2', 'Sheet3', 'Sheet4', 'Sheet5'];
+            allSheets = [];
+
+            for (let i = 0; i < sheetNames.length; i++) {
+                try {
+                    const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetNames[i]}`;
+                    const response = await fetch(apiUrl);
+
+                    if (!response.ok) continue;
+
+                    const text = await response.text();
+                    if (text.includes('error')) continue;
+
+                    const jsonText = text.substring(47).slice(0, -2);
+                    const data = JSON.parse(jsonText);
+
+                    if (data.table && data.table.rows && data.table.rows.length > 1) {
+                        const sheetData = [];
+                        parseSheetDataWithSheet(data, sheetNames[i], sheetData);
+                        
+                        if (sheetData.length > 0) {
+                            allSheets.push({
+                                name: sheetNames[i],
+                                data: sheetData
+                            });
+                            productsData.push(...sheetData);
+                        }
+                    }
+                } catch (error) {
+                    console.log(`無法載入 ${sheetNames[i]}`);
+                }
+            }
+        }
+
+        // 解析 Google Sheet 資料（含工作表名稱）
+        function parseSheetDataWithSheet(data, sheetName, output) {
             const rows = data.table.rows;
 
             if (rows.length < 2) {
-                throw new Error('試算表資料不足');
+                return;
             }
 
-            // 取得標題列（第一列）
             const headers = rows[0].c.map(cell => cell ? String(cell.v) : '');
 
-            // 找出各欄位的索引
             const codeIndex = headers.findIndex(h => h && h.includes('編號'));
             const nameIndex = headers.findIndex(h => h && h.includes('名稱'));
             const priceIndex = headers.findIndex(h => h && h.includes('價'));
             const barcodeIndex = headers.findIndex(h => h && h.includes('條碼'));
 
-            // 解析每一列資料（從第二列開始）
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i].c;
                 if (!row) continue;
@@ -411,14 +489,92 @@
                     code: row[codeIndex] ? row[codeIndex].v : '',
                     name: row[nameIndex] ? row[nameIndex].v : '',
                     price: row[priceIndex] ? row[priceIndex].v : '',
-                    barcode: row[barcodeIndex] ? row[barcodeIndex].v : ''
+                    barcode: row[barcodeIndex] ? row[barcodeIndex].v : '',
+                    sheet: sheetName
                 };
 
-                // 只加入有商品編號或名稱的資料
+                if (product.code || product.name) {
+                    output.push(product);
+                }
+            }
+        }
+
+        // 解析 Google Sheet 資料（第一個工作表）
+        function parseSheetData(data, sheetName = 'Sheet1') {
+            productsData = [];
+            const rows = data.table.rows;
+
+            if (rows.length < 2) {
+                throw new Error('試算表資料不足');
+            }
+
+            const headers = rows[0].c.map(cell => cell ? String(cell.v) : '');
+
+            const codeIndex = headers.findIndex(h => h && h.includes('編號'));
+            const nameIndex = headers.findIndex(h => h && h.includes('名稱'));
+            const priceIndex = headers.findIndex(h => h && h.includes('價'));
+            const barcodeIndex = headers.findIndex(h => h && h.includes('條碼'));
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i].c;
+                if (!row) continue;
+
+                const product = {
+                    code: row[codeIndex] ? row[codeIndex].v : '',
+                    name: row[nameIndex] ? row[nameIndex].v : '',
+                    price: row[priceIndex] ? row[priceIndex].v : '',
+                    barcode: row[barcodeIndex] ? row[barcodeIndex].v : '',
+                    sheet: sheetName
+                };
+
                 if (product.code || product.name) {
                     productsData.push(product);
                 }
             }
+
+            if (productsData.length > 0) {
+                allSheets.push({
+                    name: sheetName,
+                    data: [...productsData]
+                });
+            }
+        }
+
+        // 渲染工作表標籤
+        function renderSheetTabs() {
+            const tabsContainer = document.getElementById('sheetTabs');
+            tabsContainer.innerHTML = '';
+
+            const allTab = document.createElement('button');
+            allTab.className = 'sheet-tab all active';
+            allTab.textContent = '全部工作表';
+            allTab.onclick = () => filterBySheet('all');
+            tabsContainer.appendChild(allTab);
+
+            allSheets.forEach(sheet => {
+                const tab = document.createElement('button');
+                tab.className = 'sheet-tab';
+                tab.textContent = sheet.name;
+                tab.onclick = () => filterBySheet(sheet.name);
+                tabsContainer.appendChild(tab);
+            });
+        }
+
+        // 按工作表過濾
+        function filterBySheet(sheetName) {
+            currentSheetFilter = sheetName;
+
+            // 更新標籤外觀
+            document.querySelectorAll('.sheet-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (sheetName === 'all' && tab.classList.contains('all')) {
+                    tab.classList.add('active');
+                } else if (sheetName !== 'all' && tab.textContent === sheetName) {
+                    tab.classList.add('active');
+                }
+            });
+
+            searchProducts();
         }
 
         // 顯示商品
@@ -443,12 +599,17 @@
                     <div class="product-name">${escapeHtml(product.name)}</div>
                     <div class="product-price">NT$ ${escapeHtml(String(product.price))}</div>
                     <div class="product-barcode">條碼: ${escapeHtml(product.barcode)}</div>
+                    <div class="product-sheet">工作表: ${escapeHtml(product.sheet)}</div>
                 </div>
             `).join('');
 
             container.innerHTML = `<div class="product-grid">${html}</div>`;
 
-            document.getElementById('totalProducts').textContent = productsData.length;
+            const totalCount = currentSheetFilter === 'all' 
+                ? productsData.length 
+                : allSheets.find(s => s.name === currentSheetFilter)?.data.length || 0;
+            
+            document.getElementById('totalProducts').textContent = totalCount;
             document.getElementById('displayedProducts').textContent = products.length;
         }
 
@@ -456,19 +617,21 @@
         function searchProducts() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
 
-            if (!searchTerm) {
-                displayProducts(productsData);
-                return;
+            // 先按工作表過濾
+            let filtered = productsData;
+            if (currentSheetFilter !== 'all') {
+                filtered = allSheets.find(s => s.name === currentSheetFilter)?.data || [];
             }
 
-            const filtered = productsData.filter(product => {
-                return (
-                    String(product.code).toLowerCase().includes(searchTerm) ||
-                    String(product.name).toLowerCase().includes(searchTerm) ||
-                    String(product.barcode).toLowerCase().includes(searchTerm) ||
-                    String(product.price).toLowerCase().includes(searchTerm)
-                );
-            });
+            // 再按搜尋詞過濾（只搜尋產品編號和品名）
+            if (searchTerm) {
+                filtered = filtered.filter(product => {
+                    return (
+                        String(product.code).toLowerCase().includes(searchTerm) ||
+                        String(product.name).toLowerCase().includes(searchTerm)
+                    );
+                });
+            }
 
             displayProducts(filtered);
         }
@@ -483,6 +646,8 @@
                 document.getElementById('sheetUrl').value = '';
                 document.getElementById('setupMessage').innerHTML = '';
                 productsData = [];
+                allSheets = [];
+                currentSheetFilter = 'all';
             }
         }
 
