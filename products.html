@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>橙興生活文創 - 商品查詢系統</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -176,7 +177,23 @@
             font-size: 0.9em;
             color: #667eea;
             font-weight: 600;
-            margin-bottom: 8px;
+        }
+
+        .product-card .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .product-card .product-sheet {
+            font-size: 0.75em;
+            color: #999;
+            background: #f9f9f9;
+            padding: 4px 8px;
+            border-radius: 4px;
         }
 
         .product-card .product-name {
@@ -191,21 +208,44 @@
             font-size: 1.5em;
             color: #e74c3c;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 15px;
         }
 
-        .product-card .product-barcode {
+        .barcode-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .qrcode-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .qrcode-container canvas {
+            border: 2px solid #f0f0f0;
+            padding: 8px;
+            background: white;
+        }
+
+        .barcode-svg {
+            width: 100%;
+            height: 80px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .barcode-text {
             font-size: 0.85em;
             color: #666;
             font-family: monospace;
-        }
-
-        .product-card .product-sheet {
-            font-size: 0.8em;
-            color: #999;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #f0f0f0;
+            word-break: break-all;
+            text-align: center;
+            max-width: 100%;
         }
 
         .sheet-tabs {
@@ -393,26 +433,15 @@
 
             try {
                 // 使用 Google Sheets JSON API 獲取所有工作表
-                const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
-                const response = await fetch(apiUrl);
-
-                if (!response.ok) {
-                    throw new Error('無法讀取 Google Sheet，請確認分享設定是否正確');
-                }
-
-                const text = await response.text();
-                const jsonText = text.substring(47).slice(0, -2);
-                const data = JSON.parse(jsonText);
-
-                // 解析第一個工作表的資料
-                parseSheetData(data, 'Sheet1');
-
-                // 嘗試載入其他工作表
                 await loadAllSheets();
 
                 // 儲存到 localStorage
                 localStorage.setItem('sheetUrl', url);
                 localStorage.setItem('sheetId', sheetId);
+
+                if (productsData.length === 0) {
+                    throw new Error('未能從任何工作表中讀取資料');
+                }
 
                 messageDiv.innerHTML = '<div class="success">✓ 成功載入 ' + productsData.length + ' 筆商品資料！</div>';
 
@@ -421,7 +450,8 @@
                     document.getElementById('setupCard').style.display = 'none';
                     document.getElementById('searchSection').classList.add('active');
                     renderSheetTabs();
-                    displayProducts(productsData);
+                    // 預設不顯示商品，只顯示搜尋框
+                    displayProducts([]);
                 }, 1000);
 
             } catch (error) {
@@ -432,112 +462,289 @@
 
         // 載入所有工作表
         async function loadAllSheets() {
-            const sheetNames = ['Sheet1', 'Sheet2', 'Sheet3', 'Sheet4', 'Sheet5'];
+            productsData = [];
             allSheets = [];
+            console.log('開始載入統合工作表...');
+            
+            try {
+                // 載入統合工作表 (gid=1774941099)
+                const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=1774941099`;
+                const response = await fetch(apiUrl);
 
-            for (let i = 0; i < sheetNames.length; i++) {
-                try {
-                    const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetNames[i]}`;
-                    const response = await fetch(apiUrl);
-
-                    if (!response.ok) continue;
-
-                    const text = await response.text();
-                    if (text.includes('error')) continue;
-
-                    const jsonText = text.substring(47).slice(0, -2);
-                    const data = JSON.parse(jsonText);
-
-                    if (data.table && data.table.rows && data.table.rows.length > 1) {
-                        const sheetData = [];
-                        parseSheetDataWithSheet(data, sheetNames[i], sheetData);
-                        
-                        if (sheetData.length > 0) {
-                            allSheets.push({
-                                name: sheetNames[i],
-                                data: sheetData
-                            });
-                            productsData.push(...sheetData);
-                        }
-                    }
-                } catch (error) {
-                    console.log(`無法載入 ${sheetNames[i]}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
                 }
+
+                const text = await response.text();
+                if (text.includes('error')) {
+                    throw new Error('API 錯誤');
+                }
+
+                const jsonText = text.substring(47).slice(0, -2);
+                let data;
+                try {
+                    data = JSON.parse(jsonText);
+                } catch (e) {
+                    throw new Error('JSON 解析失敗');
+                }
+
+                if (!data.table || !data.table.rows || data.table.rows.length === 0) {
+                    throw new Error('無資料列');
+                }
+
+                const sheetData = [];
+                const sheetName = '全部商品';
+                
+                parseSheetDataWithSheet(data, sheetName, sheetData);
+                
+                if (sheetData.length > 0) {
+                    console.log(`✓ 成功載入統合工作表: ${sheetData.length} 筆商品`);
+                    allSheets.push({
+                        name: sheetName,
+                        data: sheetData,
+                        gid: 1774941099
+                    });
+                    productsData.push(...sheetData);
+                } else {
+                    throw new Error('無有效商品資料');
+                }
+                
+                console.log(`載入完成: ${productsData.length} 筆商品`);
+            } catch (error) {
+                console.error('載入失敗:', error.message);
+                throw error;
             }
         }
 
         // 解析 Google Sheet 資料（含工作表名稱）
         function parseSheetDataWithSheet(data, sheetName, output) {
             const rows = data.table.rows;
+            const cols = data.table.cols;
 
-            if (rows.length < 2) {
+            if (rows.length < 1) {
+                console.log(`[${sheetName}] 無資料列`);
                 return;
             }
 
-            const headers = rows[0].c.map(cell => cell ? String(cell.v) : '');
+            // 找出欄位索引
+            let sheetIndex = -1;      // _sheet 欄位
+            let codeIndex = -1;       // 產品編號
+            let nameIndex = -1;       // 品名
+            let barcodeIndex = -1;    // 國際條碼
+            let priceIndex = -1;      // 售價
 
-            const codeIndex = headers.findIndex(h => h && h.includes('編號'));
-            const nameIndex = headers.findIndex(h => h && h.includes('名稱'));
-            const priceIndex = headers.findIndex(h => h && h.includes('價'));
-            const barcodeIndex = headers.findIndex(h => h && h.includes('條碼'));
+            for (let i = 0; i < cols.length; i++) {
+                const label = (cols[i].label || '').trim();
+                
+                if (label === '_sheet') sheetIndex = i;
+                if (label.includes('產品編號')) codeIndex = i;
+                if (label.includes('品名')) nameIndex = i;
+                if (label.includes('國際條碼') || label.includes('條碼')) barcodeIndex = i;
+                if (label.includes('售價')) priceIndex = i;
+            }
 
-            for (let i = 1; i < rows.length; i++) {
+            // 如果沒有找到，使用預設位置
+            if (sheetIndex === -1) sheetIndex = 0;
+            if (codeIndex === -1) codeIndex = 2;
+            if (nameIndex === -1) nameIndex = 3;
+            if (barcodeIndex === -1) barcodeIndex = 4;
+            if (priceIndex === -1) priceIndex = 5;
+
+            console.log(`[${sheetName}] 欄位位置: sheet=${sheetIndex}, 編號=${codeIndex}, 名稱=${nameIndex}, 條碼=${barcodeIndex}, 價=${priceIndex}`);
+
+            const categoryMap = {};  // 用於按分類分組
+            let validCount = 0;
+
+            // 載入所有行（包括編號或品名為空的）
+            for (let i = 0; i < rows.length; i++) {
                 const row = rows[i].c;
                 if (!row) continue;
 
-                const product = {
-                    code: row[codeIndex] ? row[codeIndex].v : '',
-                    name: row[nameIndex] ? row[nameIndex].v : '',
-                    price: row[priceIndex] ? row[priceIndex].v : '',
-                    barcode: row[barcodeIndex] ? row[barcodeIndex].v : '',
-                    sheet: sheetName
+                // 安全地取得欄位值
+                const getCell = (idx) => {
+                    if (idx < 0 || idx >= row.length) return '';
+                    const cell = row[idx];
+                    if (!cell) return '';
+                    return cell.v !== null && cell.v !== undefined ? String(cell.v).trim() : '';
                 };
 
-                if (product.code || product.name) {
-                    output.push(product);
+                const category = getCell(sheetIndex) || '未分類';
+                const code = getCell(codeIndex);
+                const name = getCell(nameIndex);
+                const barcode = getCell(barcodeIndex);
+                const price = getCell(priceIndex);
+
+                // 將所有有值的商品加入（即使缺少編號或品名）
+                const product = {
+                    code: code,
+                    name: name,
+                    price: price,
+                    barcode: barcode,
+                    category: category,
+                    sheet: category,
+                    hasCode: !!code,
+                    hasName: !!name
+                };
+
+                // 只有同時有編號和名稱才認為是"有效"商品（用於搜尋篩選）
+                if (code && name) {
+                    validCount++;
                 }
+
+                output.push(product);
+
+                // 統計各分類
+                if (!categoryMap[category]) {
+                    categoryMap[category] = 0;
+                }
+                categoryMap[category]++;
             }
+
+            console.log(`[${sheetName}] 共載入 ${output.length} 筆商品，其中有效商品 ${validCount} 筆，分布在 ${Object.keys(categoryMap).length} 個分類`);
+            
+            // 顯示分類統計
+            Object.entries(categoryMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .forEach(([cat, count]) => {
+                    console.log(`  - ${cat}: ${count} 筆`);
+                });
         }
 
         // 解析 Google Sheet 資料（第一個工作表）
         function parseSheetData(data, sheetName = 'Sheet1') {
-            productsData = [];
             const rows = data.table.rows;
+            const cols = data.table.cols;
 
-            if (rows.length < 2) {
+            if (rows.length < 1) {
                 throw new Error('試算表資料不足');
             }
 
-            const headers = rows[0].c.map(cell => cell ? String(cell.v) : '');
+            // 查找所有的欄位組（多個編號-品名-條碼-售價的重複組）
+            const fieldGroups = [];
+            let currentGroup = { codeIndex: -1, nameIndex: -1, barcodeIndex: -1, priceIndex: -1 };
 
-            const codeIndex = headers.findIndex(h => h && h.includes('編號'));
-            const nameIndex = headers.findIndex(h => h && h.includes('名稱'));
-            const priceIndex = headers.findIndex(h => h && h.includes('價'));
-            const barcodeIndex = headers.findIndex(h => h && h.includes('條碼'));
+            for (let i = 0; i < cols.length; i++) {
+                const label = (cols[i].label || '').trim();
+                
+                // 跳過完全空白標籤
+                if (!label) {
+                    continue;
+                }
+                
+                // 跳過序號標籤
+                if (label === 'z' || label === '序號' || label === '(空)') {
+                    // 如果當前組有編號欄位，表示這是新的分組起點
+                    if (currentGroup.codeIndex !== -1) {
+                        fieldGroups.push({ ...currentGroup });
+                        currentGroup = { codeIndex: -1, nameIndex: -1, barcodeIndex: -1, priceIndex: -1 };
+                    }
+                    continue;
+                }
+                
+                if (label.includes('編號')) {
+                    // 如果已有編號，開始新組
+                    if (currentGroup.codeIndex !== -1) {
+                        fieldGroups.push({ ...currentGroup });
+                        currentGroup = { codeIndex: -1, nameIndex: -1, barcodeIndex: -1, priceIndex: -1 };
+                    }
+                    currentGroup.codeIndex = i;
+                } else if (label.includes('名稱') || label.includes('品名') || label.includes('商品名')) {
+                    if (currentGroup.codeIndex !== -1) {
+                        currentGroup.nameIndex = i;
+                    }
+                } else if (label.includes('條碼') || label.includes('條形碼') || label.includes('ISBN') || label.includes('BARCODE')) {
+                    if (currentGroup.codeIndex !== -1) {
+                        currentGroup.barcodeIndex = i;
+                    }
+                } else if (label.includes('特價')) {
+                    if (currentGroup.codeIndex !== -1) {
+                        currentGroup.priceIndex = i;
+                    }
+                } else if (label.includes('售價') && currentGroup.priceIndex === -1) {
+                    if (currentGroup.codeIndex !== -1) {
+                        currentGroup.priceIndex = i;
+                    }
+                }
+            }
+            
+            // 加入最後一組
+            if (currentGroup.codeIndex !== -1) {
+                fieldGroups.push(currentGroup);
+            }
 
-            for (let i = 1; i < rows.length; i++) {
-                const row = rows[i].c;
-                if (!row) continue;
+            // 如果沒有找到多個欄位組，嘗試用預設位置
+            if (fieldGroups.length === 0) {
+                // 預設：第 1 欄編號，第 2 欄品名，第 3 欄條碼，第 4 欄售價
+                fieldGroups.push({
+                    codeIndex: 1,
+                    nameIndex: 2,
+                    barcodeIndex: 3,
+                    priceIndex: 4
+                });
+                console.log(`[${sheetName}] 未找到欄位標籤，使用預設位置: 1,2,3,4`);
+            } else {
+                console.log(`[${sheetName}] 找到 ${fieldGroups.length} 個欄位組`);
+            }
 
-                const product = {
-                    code: row[codeIndex] ? row[codeIndex].v : '',
-                    name: row[nameIndex] ? row[nameIndex].v : '',
-                    price: row[priceIndex] ? row[priceIndex].v : '',
-                    barcode: row[barcodeIndex] ? row[barcodeIndex].v : '',
-                    sheet: sheetName
-                };
+            const sheetData = [];
+            let validCount = 0;
+            const samples = [];
 
-                if (product.code || product.name) {
-                    productsData.push(product);
+            // 從每個欄位組中提取商品
+            for (const group of fieldGroups) {
+                const { codeIndex, nameIndex, barcodeIndex, priceIndex } = group;
+
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i].c;
+                    if (!row) continue;
+
+                    // 安全地取得欄位值
+                    const getCell = (idx) => {
+                        if (idx < 0 || idx >= row.length) return '';
+                        const cell = row[idx];
+                        if (!cell) return '';
+                        return cell.v !== null && cell.v !== undefined ? String(cell.v).trim() : '';
+                    };
+
+                    const product = {
+                        code: getCell(codeIndex),
+                        name: getCell(nameIndex),
+                        price: getCell(priceIndex),
+                        barcode: getCell(barcodeIndex),
+                        sheet: sheetName
+                    };
+
+                    // 只有同時有編號和名稱才認為是有效商品
+                    if (product.code && product.name) {
+                        sheetData.push(product);
+                        validCount++;
+                        
+                        if (samples.length < 3) {
+                            samples.push(`"${product.code}" | "${product.name}"`);
+                        }
+                    }
                 }
             }
 
-            if (productsData.length > 0) {
+            if (sheetData.length > 0) {
                 allSheets.push({
                     name: sheetName,
-                    data: [...productsData]
+                    data: sheetData
                 });
+                productsData.push(...sheetData);
             }
+
+            if (validCount > 0) {
+                console.log(`[${sheetName}] 解析成功: ${validCount} 筆商品`);
+                if (samples.length > 0) {
+                    console.log(`[${sheetName}] 樣本: ${samples.join(', ')}`);
+                }
+            } else {
+                console.log(`[${sheetName}] 無有效商品`);
+            }
+
+            return sheetData;
         }
 
         // 渲染工作表標籤
@@ -545,36 +752,61 @@
             const tabsContainer = document.getElementById('sheetTabs');
             tabsContainer.innerHTML = '';
 
+            // 計算有效商品數量（有編號和名稱的）
+            const validCount = productsData.filter(p => p.hasCode && p.hasName).length;
+
             const allTab = document.createElement('button');
             allTab.className = 'sheet-tab all active';
-            allTab.textContent = '全部工作表';
+            allTab.textContent = `全部商品 (${validCount}/${productsData.length})`;
             allTab.onclick = () => filterBySheet('all');
             tabsContainer.appendChild(allTab);
 
-            allSheets.forEach(sheet => {
-                const tab = document.createElement('button');
-                tab.className = 'sheet-tab';
-                tab.textContent = sheet.name;
-                tab.onclick = () => filterBySheet(sheet.name);
-                tabsContainer.appendChild(tab);
+            // 按分類分組
+            const categoriesMap = {};
+            productsData.forEach(product => {
+                const category = product.category || '未分類';
+                if (!categoriesMap[category]) {
+                    categoriesMap[category] = { total: 0, valid: 0 };
+                }
+                categoriesMap[category].total++;
+                if (product.hasCode && product.hasName) {
+                    categoriesMap[category].valid++;
+                }
             });
+
+            // 按商品數量排序並顯示
+            Object.entries(categoriesMap)
+                .sort((a, b) => b[1].valid - a[1].valid)
+                .forEach(([category, counts]) => {
+                    const tab = document.createElement('button');
+                    tab.className = 'sheet-tab';
+                    tab.textContent = `${category} (${counts.valid}/${counts.total})`;
+                    tab.onclick = () => filterBySheet(category);
+                    tabsContainer.appendChild(tab);
+                });
         }
 
         // 按工作表過濾
-        function filterBySheet(sheetName) {
-            currentSheetFilter = sheetName;
+        function filterBySheet(category) {
+            currentSheetFilter = category;
 
             // 更新標籤外觀
             document.querySelectorAll('.sheet-tab').forEach(tab => {
                 tab.classList.remove('active');
-                if (sheetName === 'all' && tab.classList.contains('all')) {
+                if (category === 'all' && tab.classList.contains('all')) {
                     tab.classList.add('active');
-                } else if (sheetName !== 'all' && tab.textContent === sheetName) {
+                } else if (category !== 'all' && tab.textContent.startsWith(category)) {
                     tab.classList.add('active');
                 }
             });
 
-            searchProducts();
+            // 過濾商品
+            let filtered = productsData;
+            if (category !== 'all') {
+                filtered = productsData.filter(p => p.category === category);
+            }
+
+            displayProducts(filtered);
         }
 
         // 顯示商品
@@ -593,21 +825,44 @@
                 return;
             }
 
-            const html = products.map(product => `
+            const html = products.map((product, index) => `
                 <div class="product-card">
-                    <div class="product-code">${escapeHtml(product.code)}</div>
+                    <div class="product-header">
+                        <div class="product-code">${escapeHtml(product.code)}</div>
+                        <div class="product-sheet">${escapeHtml(product.sheet)}</div>
+                    </div>
                     <div class="product-name">${escapeHtml(product.name)}</div>
                     <div class="product-price">NT$ ${escapeHtml(String(product.price))}</div>
-                    <div class="product-barcode">條碼: ${escapeHtml(product.barcode)}</div>
-                    <div class="product-sheet">工作表: ${escapeHtml(product.sheet)}</div>
+                    
+                    <div class="barcode-section">
+                        <svg id="barcode-${index}" class="barcode-svg"></svg>
+                        <div class="barcode-text">${escapeHtml(product.barcode)}</div>
+                    </div>
                 </div>
             `).join('');
 
             container.innerHTML = `<div class="product-grid">${html}</div>`;
 
+            // 為每個商品生成條形碼
+            products.forEach((product, index) => {
+                if (product.barcode) {
+                    try {
+                        JsBarcode(`#barcode-${index}`, product.barcode, {
+                            format: "CODE128",
+                            width: 2,
+                            height: 80,
+                            displayValue: false,
+                            margin: 5
+                        });
+                    } catch (e) {
+                        console.log(`生成條形碼失敗: ${e.message}`);
+                    }
+                }
+            });
+
             const totalCount = currentSheetFilter === 'all' 
                 ? productsData.length 
-                : allSheets.find(s => s.name === currentSheetFilter)?.data.length || 0;
+                : productsData.filter(p => p.category === currentSheetFilter).length;
             
             document.getElementById('totalProducts').textContent = totalCount;
             document.getElementById('displayedProducts').textContent = products.length;
@@ -617,21 +872,30 @@
         function searchProducts() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
 
-            // 先按工作表過濾
-            let filtered = productsData;
-            if (currentSheetFilter !== 'all') {
-                filtered = allSheets.find(s => s.name === currentSheetFilter)?.data || [];
+            // 如果沒有輸入搜尋詞，不顯示任何商品
+            if (!searchTerm) {
+                displayProducts([]);
+                return;
             }
 
-            // 再按搜尋詞過濾（只搜尋產品編號和品名）
-            if (searchTerm) {
-                filtered = filtered.filter(product => {
-                    return (
-                        String(product.code).toLowerCase().includes(searchTerm) ||
-                        String(product.name).toLowerCase().includes(searchTerm)
-                    );
-                });
+            // 先按分類過濾
+            let filtered = productsData;
+            if (currentSheetFilter !== 'all') {
+                filtered = productsData.filter(p => p.category === currentSheetFilter);
             }
+
+            // 再按搜尋詞過濾，只搜尋編號和名稱都有值的商品
+            filtered = filtered.filter(product => {
+                // 只考慮有編號和名稱的商品
+                if (!product.hasCode || !product.hasName) {
+                    return false;
+                }
+                
+                return (
+                    String(product.code).toLowerCase().includes(searchTerm) ||
+                    String(product.name).toLowerCase().includes(searchTerm)
+                );
+            });
 
             displayProducts(filtered);
         }
