@@ -147,6 +147,42 @@
             font-size: 18px;
         }
 
+        .search-options {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .checkbox-label:hover {
+            background: #f5f5f5;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+            flex-shrink: 0;
+        }
+
+        .checkbox-text {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+        }
+
         .search-box::before {
             content: "🔍";
             position: absolute;
@@ -294,11 +330,33 @@
             display: flex;
             gap: 12px;
             margin-bottom: 25px;
-            flex-wrap: wrap;
             padding: 15px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+        }
+
+        .sheet-tabs::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .sheet-tabs::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .sheet-tabs::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 10px;
+        }
+
+        .sheet-tabs::-webkit-scrollbar-thumb:hover {
+            background: #999;
         }
 
         .sheet-tab {
@@ -311,6 +369,8 @@
             font-weight: 500;
             transition: all 0.3s ease;
             color: #666;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .sheet-tab:hover {
@@ -329,6 +389,9 @@
 
         .sheet-tab.all {
             font-weight: 600;
+            position: sticky;
+            left: 0;
+            z-index: 10;
         }
 
         .no-results {
@@ -437,6 +500,16 @@
                         id="searchInput"
                         placeholder="搜尋商品編號、名稱或條碼..."
                         oninput="searchProducts()">
+                </div>
+
+                <div class="search-options">
+                    <label class="checkbox-label">
+                        <input 
+                            type="checkbox" 
+                            id="searchBarcode"
+                            onchange="searchProducts()">
+                        <span class="checkbox-text">搜尋條碼</span>
+                    </label>
                 </div>
 
                 <button class="btn" onclick="resetSheet()" style="background: #95a5a6; margin-top: 10px;">
@@ -923,6 +996,7 @@
         // 搜尋商品
         function searchProducts() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const searchBarcodeEnabled = document.getElementById('searchBarcode').checked;
 
             // 如果沒有輸入搜尋詞，不顯示任何商品
             if (!searchTerm) {
@@ -943,12 +1017,18 @@
                     return false;
                 }
                 
-                // 搜尋產品編號、品名、條碼（模糊查詢）
-                return (
+                // 搜尋產品編號、品名
+                let matches = (
                     String(product.code).toLowerCase().includes(searchTerm) ||
-                    String(product.name).toLowerCase().includes(searchTerm) ||
-                    String(product.barcode).toLowerCase().includes(searchTerm)
+                    String(product.name).toLowerCase().includes(searchTerm)
                 );
+
+                // 如果啟用條碼搜尋，也搜尋條碼
+                if (searchBarcodeEnabled && !matches) {
+                    matches = String(product.barcode).toLowerCase().includes(searchTerm);
+                }
+
+                return matches;
             });
 
             displayProducts(filtered);
