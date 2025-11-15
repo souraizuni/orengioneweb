@@ -27,13 +27,22 @@
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
+            padding: 20px;
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            font-size: 3em;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.3em;
+            opacity: 0.95;
+            font-weight: 300;
+            letter-spacing: 1px;
         }
 
         .card {
@@ -107,20 +116,45 @@
 
         .search-box {
             position: relative;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
         }
 
         .search-box input {
-            padding-left: 45px;
+            width: 100%;
+            padding: 20px 60px 20px 60px;
+            padding-left: 70px;
+            border: 3px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            background: #f9f9f9;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 5px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box input::placeholder {
+            color: #999;
+            font-size: 18px;
         }
 
         .search-box::before {
             content: "🔍";
             position: absolute;
-            left: 15px;
+            left: 40px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 20px;
+            font-size: 32px;
+            z-index: 10;
         }
 
         .stats {
@@ -132,23 +166,31 @@
 
         .stat-card {
             flex: 1;
-            min-width: 150px;
+            min-width: 180px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 12px;
             text-align: center;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
         }
 
         .stat-card .number {
-            font-size: 2em;
+            font-size: 2.5em;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
         .stat-card .label {
-            font-size: 0.9em;
-            opacity: 0.9;
+            font-size: 0.95em;
+            opacity: 0.95;
+            font-weight: 500;
         }
 
         .product-grid {
@@ -250,29 +292,39 @@
 
         .sheet-tabs {
             display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         .sheet-tab {
-            padding: 8px 16px;
+            padding: 12px 20px;
             border: 2px solid #e0e0e0;
-            border-radius: 6px;
+            border-radius: 8px;
             background: white;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: #666;
         }
 
         .sheet-tab:hover {
             border-color: #667eea;
+            color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
         }
 
         .sheet-tab.active {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-color: #667eea;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
 
         .sheet-tab.all {
@@ -891,9 +943,11 @@
                     return false;
                 }
                 
+                // 搜尋產品編號、品名、條碼（模糊查詢）
                 return (
                     String(product.code).toLowerCase().includes(searchTerm) ||
-                    String(product.name).toLowerCase().includes(searchTerm)
+                    String(product.name).toLowerCase().includes(searchTerm) ||
+                    String(product.barcode).toLowerCase().includes(searchTerm)
                 );
             });
 
