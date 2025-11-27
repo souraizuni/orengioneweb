@@ -1452,9 +1452,25 @@
             container.innerHTML = `<div class="product-list">${html}</div>`;
         }
 
+        // 清理條碼（移除空格，只保留數字）
+        function cleanBarcode(barcode) {
+            if (!barcode) return '';
+            return String(barcode).replace(/\s/g, '').replace(/[^0-9]/g, '');
+        }
+
+        // 檢查條碼是否有效（13碼）
+        function isValidBarcode(barcode) {
+            const cleaned = cleanBarcode(barcode);
+            return cleaned.length === 13;
+        }
+
         // 網格視圖
         function displayGridView(products, container) {
-            const html = products.map((product, index) => `
+            const html = products.map((product, index) => {
+                const cleanedBarcode = cleanBarcode(product.barcode);
+                const hasValidBarcode = isValidBarcode(product.barcode);
+                
+                return `
                 <div class="product-card">
                     <div class="product-header">
                         <div class="product-code">${escapeHtml(product.code)}</div>
@@ -1463,24 +1479,27 @@
                     <div class="product-name">${escapeHtml(product.name)}</div>
                     <div class="product-price">NT$ ${escapeHtml(String(product.price))}</div>
                     
+                    ${hasValidBarcode ? `
                     <div class="barcode-section">
                         <svg id="barcode-${index}" class="barcode-svg"></svg>
-                        <div class="barcode-text">${escapeHtml(product.barcode)}</div>
+                        <div class="barcode-text">${escapeHtml(cleanedBarcode)}</div>
                     </div>
+                    ` : ''}
                 </div>
-            `).join('');
+            `}).join('');
 
             container.innerHTML = `<div class="product-grid">${html}</div>`;
 
-            // 為每個商品生成條形碼
+            // 為每個商品生成條形碼（只處理有效的13碼條碼）
             products.forEach((product, index) => {
-                if (product.barcode) {
+                if (isValidBarcode(product.barcode)) {
                     const barcodeElement = document.querySelector(`#barcode-${index}`);
                     if (!barcodeElement) return;
 
+                    const cleanedBarcode = cleanBarcode(product.barcode);
                     try {
-                        JsBarcode(`#barcode-${index}`, product.barcode, {
-                            format: "CODE128",
+                        JsBarcode(`#barcode-${index}`, cleanedBarcode, {
+                            format: "EAN13",
                             width: 2,
                             height: 80,
                             displayValue: false,
@@ -1631,11 +1650,11 @@
                     <div>
                         <strong style="color: #667eea;">國際條碼</strong>
                         <div style="font-size: 14px; color: #333; font-family: monospace; margin-top: 8px; padding: 10px; background: #f9f9f9; border-radius: 6px; word-break: break-all;">
-                            ${escapeHtml(product.barcode || '無')}
+                            ${escapeHtml(cleanBarcode(product.barcode) || '無')}
                         </div>
                     </div>
 
-                    ${product.barcode ? `
+                    ${isValidBarcode(product.barcode) ? `
                     <div>
                         <strong style="color: #667eea;">條形碼</strong>
                         <div style="margin-top: 8px; display: flex; justify-content: center;">
@@ -1654,15 +1673,16 @@
                 if (e.target === modal) modal.remove();
             };
 
-            // 生成條形碼
-            if (product.barcode) {
+            // 生成條形碼（只處理有效的13碼條碼）
+            if (isValidBarcode(product.barcode)) {
                 setTimeout(() => {
                     const modalBarcode = document.querySelector('#modal-barcode');
                     if (!modalBarcode) return;
 
+                    const cleanedBarcode = cleanBarcode(product.barcode);
                     try {
-                        JsBarcode('#modal-barcode', product.barcode, {
-                            format: "CODE128",
+                        JsBarcode('#modal-barcode', cleanedBarcode, {
+                            format: "EAN13",
                             width: 2,
                             height: 80,
                             displayValue: false,
