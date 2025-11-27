@@ -1482,7 +1482,6 @@
                     ${hasValidBarcode ? `
                     <div class="barcode-section">
                         <svg id="barcode-${index}" class="barcode-svg"></svg>
-                        <div class="barcode-text">${escapeHtml(cleanedBarcode)}</div>
                     </div>
                     ` : ''}
                 </div>
@@ -1501,8 +1500,10 @@
                         JsBarcode(`#barcode-${index}`, cleanedBarcode, {
                             format: "EAN13",
                             width: 2,
-                            height: 80,
-                            displayValue: false,
+                            height: 60,
+                            displayValue: true,
+                            fontSize: 14,
+                            textMargin: 5,
                             margin: 5
                         });
                     } catch (e) {
@@ -1684,8 +1685,10 @@
                         JsBarcode('#modal-barcode', cleanedBarcode, {
                             format: "EAN13",
                             width: 2,
-                            height: 80,
-                            displayValue: false,
+                            height: 60,
+                            displayValue: true,
+                            fontSize: 16,
+                            textMargin: 5,
                             margin: 5
                         });
                     } catch (e) {
