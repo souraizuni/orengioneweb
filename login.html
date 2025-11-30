@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 橙興生活文創</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .login-header h1 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #999;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .btn-login:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #eee;
+        }
+
+        .login-footer p {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn-login.loading .loading-spinner {
+            display: inline-block;
+        }
+
+        .btn-login.loading .btn-text {
+            opacity: 0.7;
+        }
+
+        /* 記住登入 */
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .remember-me input {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+
+        .remember-me label {
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">🛍️</div>
+            <h1>橙興生活文創</h1>
+            <p>進銷存管理系統</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="email">電子郵件</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email"
+                    placeholder="請輸入電子郵件"
+                    required
+                    autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">密碼</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password"
+                    placeholder="請輸入密碼"
+                    required
+                    autocomplete="current-password">
+            </div>
+
+            <div class="remember-me">
+                <input type="checkbox" id="rememberMe" name="rememberMe">
+                <label for="rememberMe">記住我</label>
+            </div>
+
+            <button type="submit" class="btn-login" id="loginBtn">
+                <span class="loading-spinner"></span>
+                <span class="btn-text">登入</span>
+            </button>
+        </form>
+
+        <div class="login-footer">
+            <p>尚未有帳號？請聯絡管理員建立</p>
+            <a href="products.html" class="back-link">← 返回商品查詢</a>
+        </div>
+    </div>
+
+    <!-- 載入模組 -->
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+
+    <script>
+        // 頁面載入時檢查是否已登入
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 初始化 Supabase
+            if (!initSupabase()) {
+                showError('系統設定不完整，請聯絡管理員');
+                return;
+            }
+
+            // 檢查是否已登入
+            const user = await getCurrentUser();
+            if (user) {
+                // 已登入，重導向
+                redirectAfterLogin();
+            }
+
+            // 自動填入記住的 email
+            const savedEmail = localStorage.getItem('remembered_email');
+            if (savedEmail) {
+                document.getElementById('email').value = savedEmail;
+                document.getElementById('rememberMe').checked = true;
+            }
+        });
+
+        // 處理登入
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const loginBtn = document.getElementById('loginBtn');
+
+            // 隱藏錯誤訊息
+            hideError();
+
+            // 顯示載入狀態
+            loginBtn.classList.add('loading');
+            loginBtn.disabled = true;
+
+            try {
+                const { user, error } = await login(email, password);
+
+                if (error) {
+                    showError(translateAuthError(error.message));
+                    return;
+                }
+
+                // 記住 email
+                if (rememberMe) {
+                    localStorage.setItem('remembered_email', email);
+                } else {
+                    localStorage.removeItem('remembered_email');
+                }
+
+                // 顯示成功訊息
+                showToast(`歡迎回來，${user.displayName}！`, 'success');
+
+                // 延遲重導向
+                setTimeout(() => {
+                    redirectAfterLogin();
+                }, 500);
+
+            } catch (err) {
+                showError('登入時發生錯誤，請稍後再試');
+                console.error('登入錯誤:', err);
+            } finally {
+                loginBtn.classList.remove('loading');
+                loginBtn.disabled = false;
+            }
+        }
+
+        // 登入後重導向
+        function redirectAfterLogin() {
+            // 檢查是否有重導向參數
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = urlParams.get('redirect');
+
+            if (redirectUrl) {
+                window.location.href = decodeURIComponent(redirectUrl);
+            } else {
+                window.location.href = 'products.html';
+            }
+        }
+
+        // 顯示錯誤訊息
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        // 隱藏錯誤訊息
+        function hideError() {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.classList.remove('show');
+        }
+
+        // 翻譯 Supabase 認證錯誤訊息
+        function translateAuthError(message) {
+            const translations = {
+                'Invalid login credentials': '電子郵件或密碼錯誤',
+                'Email not confirmed': '請先確認您的電子郵件',
+                'Invalid email or password': '電子郵件或密碼錯誤',
+                'User not found': '找不到此使用者',
+                'Too many requests': '嘗試次數過多，請稍後再試',
+            };
+
+            return translations[message] || message;
+        }
+    </script>
+</body>
+</html>
