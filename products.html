@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>橙興生活文創 - 商品查詢系統</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Barcode 函式庫 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -16,7 +21,149 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding-top: 70px;
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-bottom: 20px;
+        }
+
+        /* ========================================
+           導航列樣式
+           ======================================== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #333;
+            text-decoration: none;
+        }
+
+        .navbar-brand .logo {
+            font-size: 1.5em;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 5px;
+        }
+
+        .navbar-menu a {
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .navbar-menu a:hover {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .navbar-menu a.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .navbar-menu a.nav-manager {
+            display: none;
+        }
+
+        .navbar-menu a.nav-admin {
+            display: none;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #f5f5f5;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .user-info.show {
+            display: flex;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .user-role {
+            color: #667eea;
+            font-size: 12px;
+        }
+
+        .btn-nav {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-logout {
+            background: #f0f0f0;
+            color: #666;
+            display: none;
+        }
+
+        .btn-logout.show {
+            display: inline-block;
+        }
+
+        .btn-logout:hover {
+            background: #e0e0e0;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-menu {
+                display: none;
+            }
+            
+            .user-info .user-role {
+                display: none;
+            }
         }
 
         .container {
@@ -670,6 +817,33 @@
     </style>
 </head>
 <body>
+    <!-- 導航列 -->
+    <nav class="nav-bar" id="navBar">
+        <div class="nav-brand">
+            <a href="index.html">🛍️ 橙興生活文創</a>
+        </div>
+        <div class="nav-links">
+            <a href="products.html" class="active">商品查詢</a>
+            <a href="inventory.html" class="auth-required" data-min-role="staff">庫存管理</a>
+            <a href="purchase.html" class="auth-required" data-min-role="staff">進貨作業</a>
+            <a href="sales.html" class="auth-required" data-min-role="staff">銷貨作業</a>
+            <a href="reports.html" class="auth-required" data-min-role="manager">報表中心</a>
+            <a href="admin.html" class="auth-required" data-min-role="admin">系統管理</a>
+        </div>
+        <div class="user-menu" id="userMenu">
+            <!-- 未登入狀態 -->
+            <div class="guest-actions" id="guestActions">
+                <a href="login.html" class="auth-btn login-btn">登入</a>
+            </div>
+            <!-- 已登入狀態 -->
+            <div class="user-info" id="userInfo" style="display: none;">
+                <span class="user-name" id="userName"></span>
+                <span class="user-role" id="userRole"></span>
+                <button class="auth-btn logout-btn" onclick="handleLogout()">登出</button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <div class="header" id="pageHeader">
             <h1>🛍️ 橙興生活文創</h1>
@@ -1774,6 +1948,94 @@
                 document.getElementById('sheetUrl').value = savedUrl;
                 loadSheet();
             }
+        });
+
+        // ========== 認證相關函式 ==========
+        
+        // 更新導航列認證狀態
+        async function updateAuthUI() {
+            const guestActions = document.getElementById('guestActions');
+            const userInfo = document.getElementById('userInfo');
+            const userName = document.getElementById('userName');
+            const userRole = document.getElementById('userRole');
+            
+            // 檢查 Supabase 是否啟用
+            if (typeof window.APP_CONFIG === 'undefined' || !window.APP_CONFIG.ENABLE_SUPABASE) {
+                // Supabase 未啟用，隱藏認證相關 UI
+                if (guestActions) guestActions.style.display = 'none';
+                if (userInfo) userInfo.style.display = 'none';
+                updateNavLinksVisibility(null);
+                return;
+            }
+            
+            try {
+                const user = await getCurrentUser();
+                
+                if (user) {
+                    // 已登入
+                    if (guestActions) guestActions.style.display = 'none';
+                    if (userInfo) userInfo.style.display = 'flex';
+                    
+                    const role = await getUserRole();
+                    if (userName) userName.textContent = user.email;
+                    if (userRole) {
+                        const roleNames = { admin: '管理員', manager: '主管', staff: '員工' };
+                        userRole.textContent = roleNames[role] || role;
+                    }
+                    
+                    updateNavLinksVisibility(role);
+                } else {
+                    // 未登入
+                    if (guestActions) guestActions.style.display = 'flex';
+                    if (userInfo) userInfo.style.display = 'none';
+                    updateNavLinksVisibility(null);
+                }
+            } catch (error) {
+                console.error('認證狀態檢查失敗:', error);
+                if (guestActions) guestActions.style.display = 'flex';
+                if (userInfo) userInfo.style.display = 'none';
+                updateNavLinksVisibility(null);
+            }
+        }
+        
+        // 根據角色更新導航連結可見性
+        function updateNavLinksVisibility(userRole) {
+            const authLinks = document.querySelectorAll('.auth-required');
+            const roleHierarchy = { admin: 3, manager: 2, staff: 1 };
+            const userLevel = userRole ? (roleHierarchy[userRole] || 0) : 0;
+            
+            authLinks.forEach(link => {
+                const minRole = link.dataset.minRole;
+                const requiredLevel = roleHierarchy[minRole] || 0;
+                
+                if (userLevel >= requiredLevel) {
+                    link.style.display = 'inline-block';
+                    link.classList.remove('disabled');
+                } else {
+                    link.style.display = 'none';
+                }
+            });
+        }
+        
+        // 登出處理
+        async function handleLogout() {
+            if (typeof logout === 'function') {
+                try {
+                    await logout();
+                    updateAuthUI();
+                    // 可選：重新導向到首頁
+                    // window.location.href = 'index.html';
+                } catch (error) {
+                    console.error('登出失敗:', error);
+                    alert('登出失敗，請稍後再試');
+                }
+            }
+        }
+        
+        // 頁面載入時初始化認證狀態
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延遲執行以確保其他腳本已載入
+            setTimeout(updateAuthUI, 100);
         });
     </script>
 </body>

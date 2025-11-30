@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>報表中心 - 橙興生活文創</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 應用程式模組 -->
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-top: 70px;
+        }
+
+        /* 導航列 */
+        .nav-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .nav-brand a {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 5px;
+        }
+
+        .nav-links a {
+            padding: 8px 15px;
+            color: #555;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .nav-links a.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-name { font-size: 0.9em; color: #333; }
+        .user-role { font-size: 0.75em; background: #667eea; color: white; padding: 3px 8px; border-radius: 12px; }
+
+        .auth-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .login-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .logout-btn { background: #f0f0f0; color: #666; }
+
+        /* 主要內容 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .page-header h1 { color: #333; font-size: 1.8em; margin-bottom: 8px; }
+        .page-header p { color: #666; }
+
+        /* 統計摘要 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+        }
+
+        .stat-card .value {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 0.95em;
+            color: #888;
+        }
+
+        .stat-card .trend {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .stat-card .trend.up { background: #e8f5e9; color: #27ae60; }
+        .stat-card .trend.down { background: #ffebee; color: #e74c3c; }
+
+        /* 報表區塊 */
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .report-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .report-card h2 {
+            color: #333;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .report-card .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        .btn-export { background: #e3f2fd; color: #2196f3; }
+        .btn-print { background: #fff3e0; color: #f39c12; }
+
+        /* 圖表佔位 */
+        .chart-placeholder {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #888;
+        }
+
+        .chart-placeholder .icon { font-size: 3em; margin-bottom: 10px; }
+
+        /* 表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .data-table th {
+            background: #fafafa;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .data-table tbody tr:hover { background: #f8f9ff; }
+
+        /* 日期選擇器 */
+        .date-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .date-filter label { color: #555; font-weight: 500; }
+        
+        .date-filter input,
+        .date-filter select {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+
+        /* 未授權 */
+        .auth-message {
+            background: white;
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-message .icon { font-size: 4em; margin-bottom: 20px; }
+        .auth-message h2 { color: #333; margin-bottom: 15px; }
+        .auth-message p { color: #666; margin-bottom: 25px; }
+
+        /* 載入中 */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-overlay.active { display: flex; }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .reports-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 導航列 -->
+    <nav class="nav-bar">
+        <div class="nav-brand">
+            <a href="index.html">🛍️ 橙興生活文創</a>
+        </div>
+        <div class="nav-links">
+            <a href="products.html">商品查詢</a>
+            <a href="inventory.html">庫存管理</a>
+            <a href="purchase.html">進貨作業</a>
+            <a href="sales.html">銷貨作業</a>
+            <a href="reports.html" class="active">報表中心</a>
+            <a href="admin.html" class="auth-required" data-min-role="admin">系統管理</a>
+        </div>
+        <div class="user-menu" id="userMenu">
+            <div class="guest-actions" id="guestActions">
+                <a href="login.html" class="auth-btn login-btn">登入</a>
+            </div>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <span class="user-name" id="userName"></span>
+                <span class="user-role" id="userRole"></span>
+                <button class="auth-btn logout-btn" onclick="handleLogout()">登出</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 未授權 -->
+        <div class="auth-message" id="authMessage" style="display: none;">
+            <div class="icon">🔒</div>
+            <h2>需要主管權限</h2>
+            <p>您需要主管或管理員權限才能存取報表中心</p>
+            <a href="login.html" class="btn btn-primary">前往登入</a>
+        </div>
+
+        <!-- 主要內容 -->
+        <div id="mainContent" style="display: none;">
+            <div class="page-header">
+                <h1>📊 報表中心</h1>
+                <p>銷售分析、庫存報表與經營數據一覽</p>
+            </div>
+
+            <!-- 日期篩選 -->
+            <div class="date-filter">
+                <label>報表期間：</label>
+                <select id="periodSelect" onchange="changePeriod()">
+                    <option value="today">今日</option>
+                    <option value="week" selected>本週</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季</option>
+                    <option value="custom">自訂</option>
+                </select>
+                <input type="date" id="startDate" style="display: none;">
+                <input type="date" id="endDate" style="display: none;">
+                <button class="btn btn-primary" onclick="refreshReports()">🔄 重新整理</button>
+            </div>
+
+            <!-- 統計摘要 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="icon">💰</div>
+                    <div class="value" id="totalRevenue">$0</div>
+                    <div class="label">銷售總額</div>
+                    <span class="trend up" id="revenueTrend">↑ 12%</span>
+                </div>
+                <div class="stat-card">
+                    <div class="icon">📦</div>
+                    <div class="value" id="totalOrders">0</div>
+                    <div class="label">訂單數量</div>
+                    <span class="trend up" id="ordersTrend">↑ 8%</span>
+                </div>
+                <div class="stat-card">
+                    <div class="icon">🛒</div>
+                    <div class="value" id="avgOrderValue">$0</div>
+                    <div class="label">平均客單價</div>
+                    <span class="trend up" id="avgTrend">↑ 5%</span>
+                </div>
+                <div class="stat-card">
+                    <div class="icon">📈</div>
+                    <div class="value" id="grossProfit">$0</div>
+                    <div class="label">毛利潤</div>
+                    <span class="trend down" id="profitTrend">↓ 3%</span>
+                </div>
+            </div>
+
+            <!-- 報表區 -->
+            <div class="reports-grid">
+                <!-- 銷售趨勢 -->
+                <div class="report-card">
+                    <h2>
+                        📈 銷售趨勢
+                        <div class="actions">
+                            <button class="btn-sm btn-export" onclick="exportReport('sales')">匯出</button>
+                        </div>
+                    </h2>
+                    <div class="chart-placeholder">
+                        <div class="icon">📊</div>
+                        <p>銷售趨勢圖表</p>
+                        <p style="font-size: 0.85em;">整合 Chart.js 後顯示</p>
+                    </div>
+                </div>
+
+                <!-- 熱銷商品 -->
+                <div class="report-card">
+                    <h2>
+                        🔥 熱銷商品 TOP 5
+                        <div class="actions">
+                            <button class="btn-sm btn-export" onclick="exportReport('products')">匯出</button>
+                        </div>
+                    </h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>排名</th>
+                                <th>商品</th>
+                                <th>銷量</th>
+                                <th>金額</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topProductsBody">
+                            <!-- 動態內容 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 庫存警示 -->
+                <div class="report-card">
+                    <h2>
+                        ⚠️ 庫存警示
+                        <div class="actions">
+                            <button class="btn-sm btn-export" onclick="exportReport('inventory')">匯出</button>
+                        </div>
+                    </h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>商品</th>
+                                <th>現有</th>
+                                <th>安全</th>
+                                <th>狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryAlertBody">
+                            <!-- 動態內容 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 進銷存摘要 -->
+                <div class="report-card">
+                    <h2>
+                        📋 進銷存摘要
+                        <div class="actions">
+                            <button class="btn-sm btn-print" onclick="printReport()">列印</button>
+                        </div>
+                    </h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>項目</th>
+                                <th>數量</th>
+                                <th>金額</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody">
+                            <tr>
+                                <td>期初庫存</td>
+                                <td id="openingQty">-</td>
+                                <td id="openingValue">-</td>
+                            </tr>
+                            <tr>
+                                <td>進貨</td>
+                                <td id="purchaseQty">-</td>
+                                <td id="purchaseValue">-</td>
+                            </tr>
+                            <tr>
+                                <td>銷貨</td>
+                                <td id="salesQty">-</td>
+                                <td id="salesValue">-</td>
+                            </tr>
+                            <tr style="font-weight: 700; background: #f5f5f5;">
+                                <td>期末庫存</td>
+                                <td id="closingQty">-</td>
+                                <td id="closingValue">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let userRole = null;
+
+        async function checkAuth() {
+            const mainContent = document.getElementById('mainContent');
+            const authMessage = document.getElementById('authMessage');
+            
+            if (typeof window.APP_CONFIG === 'undefined' || !window.APP_CONFIG.ENABLE_SUPABASE) {
+                mainContent.style.display = 'block';
+                authMessage.style.display = 'none';
+                loadDemoData();
+                return;
+            }
+            
+            try {
+                currentUser = await getCurrentUser();
+                
+                if (currentUser) {
+                    userRole = await getUserRole();
+                    
+                    // 需要 manager 權限
+                    if (hasPermission('manager')) {
+                        mainContent.style.display = 'block';
+                        authMessage.style.display = 'none';
+                        await loadReportData();
+                    } else {
+                        mainContent.style.display = 'none';
+                        authMessage.style.display = 'block';
+                    }
+                } else {
+                    mainContent.style.display = 'none';
+                    authMessage.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('認證檢查失敗:', error);
+                mainContent.style.display = 'none';
+                authMessage.style.display = 'block';
+            }
+            
+            updateAuthUI();
+        }
+
+        async function updateAuthUI() {
+            const guestActions = document.getElementById('guestActions');
+            const userInfo = document.getElementById('userInfo');
+            
+            if (currentUser) {
+                guestActions.style.display = 'none';
+                userInfo.style.display = 'flex';
+                document.getElementById('userName').textContent = currentUser.email;
+                
+                const roleNames = { admin: '管理員', manager: '主管', staff: '員工' };
+                document.getElementById('userRole').textContent = roleNames[userRole] || userRole;
+            } else {
+                guestActions.style.display = 'flex';
+                userInfo.style.display = 'none';
+            }
+        }
+
+        async function handleLogout() {
+            if (typeof logout === 'function') {
+                await logout();
+                window.location.href = 'login.html';
+            }
+        }
+
+        async function loadReportData() {
+            showLoading(true);
+            try {
+                // TODO: 從 Supabase 載入實際資料
+                loadDemoData();
+            } catch (error) {
+                console.error('載入報表資料失敗:', error);
+                loadDemoData();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function loadDemoData() {
+            // 統計摘要
+            document.getElementById('totalRevenue').textContent = '$128,500';
+            document.getElementById('totalOrders').textContent = '156';
+            document.getElementById('avgOrderValue').textContent = '$824';
+            document.getElementById('grossProfit').textContent = '$45,200';
+
+            // 熱銷商品
+            const topProducts = [
+                { rank: 1, name: '手工皂禮盒', quantity: 45, amount: 15750 },
+                { rank: 2, name: '精油蠟燭', quantity: 38, amount: 10640 },
+                { rank: 3, name: '手作飾品組', quantity: 32, amount: 16640 },
+                { rank: 4, name: '乾燥花束', quantity: 28, amount: 12600 },
+                { rank: 5, name: '環保購物袋', quantity: 25, amount: 4500 },
+            ];
+
+            document.getElementById('topProductsBody').innerHTML = topProducts.map(p => `
+                <tr>
+                    <td><strong>#${p.rank}</strong></td>
+                    <td>${escapeHtml(p.name)}</td>
+                    <td>${p.quantity}</td>
+                    <td>$${p.amount.toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            // 庫存警示
+            const inventoryAlerts = [
+                { name: '環保購物袋', current: 5, min: 15, status: 'critical' },
+                { name: '乾燥花束', current: 8, min: 10, status: 'low' },
+                { name: '精油蠟燭', current: 15, min: 20, status: 'low' },
+            ];
+
+            document.getElementById('inventoryAlertBody').innerHTML = inventoryAlerts.map(i => `
+                <tr>
+                    <td>${escapeHtml(i.name)}</td>
+                    <td>${i.current}</td>
+                    <td>${i.min}</td>
+                    <td><span style="color: ${i.status === 'critical' ? '#e74c3c' : '#f39c12'}">${i.status === 'critical' ? '缺貨' : '偏低'}</span></td>
+                </tr>
+            `).join('');
+
+            // 進銷存摘要
+            document.getElementById('openingQty').textContent = '500';
+            document.getElementById('openingValue').textContent = '$85,000';
+            document.getElementById('purchaseQty').textContent = '200';
+            document.getElementById('purchaseValue').textContent = '$32,000';
+            document.getElementById('salesQty').textContent = '156';
+            document.getElementById('salesValue').textContent = '$128,500';
+            document.getElementById('closingQty').textContent = '544';
+            document.getElementById('closingValue').textContent = '$92,000';
+        }
+
+        function changePeriod() {
+            const period = document.getElementById('periodSelect').value;
+            const startDate = document.getElementById('startDate');
+            const endDate = document.getElementById('endDate');
+            
+            if (period === 'custom') {
+                startDate.style.display = 'inline-block';
+                endDate.style.display = 'inline-block';
+            } else {
+                startDate.style.display = 'none';
+                endDate.style.display = 'none';
+            }
+        }
+
+        function refreshReports() {
+            loadReportData();
+        }
+
+        function exportReport(type) {
+            alert(`匯出 ${type} 報表功能開發中...`);
+        }
+
+        function printReport() {
+            window.print();
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('active', show);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>
