@@ -415,6 +415,37 @@
             color: #667eea;
         }
 
+        .keyboard-mode-toggle {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        .kb-mode-btn {
+            padding: 8px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .kb-mode-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .kb-mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
         .product-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -717,6 +748,11 @@
                         readonly>
                 </div>
 
+                <div class="keyboard-mode-toggle" id="keyboardModeToggle">
+                    <button class="kb-mode-btn active" onclick="switchKeyboardMode('web', this)">⌨️ 網頁鍵盤</button>
+                    <button class="kb-mode-btn" onclick="switchKeyboardMode('native', this)">📱 手機鍵盤</button>
+                </div>
+
                 <div class="keyboard-container" id="keyboardContainer">
                     <!-- 鍵盤會通過 JavaScript 生成 -->
                 </div>
@@ -795,6 +831,42 @@
         let currentViewMode = 'list';  // 'list' 或 'grid'
         let currentMode = 'quick';  // 'quick' 或 'search'
         let searchTimeout = null;  // debounce timer
+        let currentKeyboardMode = localStorage.getItem('keyboardMode') || 'web';  // 'web' 或 'native'
+
+        // 切換鍵盤模式（網頁鍵盤 / 手機鍵盤）
+        function switchKeyboardMode(mode, clickedButton) {
+            currentKeyboardMode = mode;
+            localStorage.setItem('keyboardMode', mode);
+
+            document.querySelectorAll('.kb-mode-btn').forEach(btn => btn.classList.remove('active'));
+            if (clickedButton) clickedButton.classList.add('active');
+
+            const quickInput = document.getElementById('quickInput');
+            const keyboardContainer = document.getElementById('keyboardContainer');
+            const keyboardActions = document.querySelector('.keyboard-actions');
+
+            if (mode === 'native') {
+                quickInput.removeAttribute('readonly');
+                keyboardContainer.style.display = 'none';
+                keyboardActions.style.display = 'none';
+                quickInput.focus();
+            } else {
+                quickInput.setAttribute('readonly', true);
+                keyboardContainer.style.display = '';
+                keyboardActions.style.display = '';
+            }
+        }
+
+        function applyKeyboardMode() {
+            const btns = document.querySelectorAll('.kb-mode-btn');
+            btns.forEach(btn => btn.classList.remove('active'));
+            if (currentKeyboardMode === 'native') {
+                if (btns[1]) btns[1].classList.add('active');
+            } else {
+                if (btns[0]) btns[0].classList.add('active');
+            }
+            switchKeyboardMode(currentKeyboardMode, document.querySelector('.kb-mode-btn.active'));
+        }
 
         // 鍵盤配置（QWERTY 佈局）
         const keyboardLayout = [
@@ -984,6 +1056,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 initKeyboard();
+                applyKeyboardMode();
                 // 載入時隱藏標題（快速查詢模式為預設）
                 document.getElementById('pageHeader').style.display = 'none';
             }, 500);
